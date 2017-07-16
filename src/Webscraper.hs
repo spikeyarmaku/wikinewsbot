@@ -7,7 +7,7 @@ import Network.HTTP.Conduit (simpleHttp)
 import Text.HTML.DOM        (parseLBS)
 import Text.XML.Cursor      ( fromDocument, Cursor, element, attributeIs, (>=>)
                             , child, content, ($//), ($/), (&/), (&//), cut
-                            , (&|), ($|), ($.//))
+                            , (&|), ($|), ($.//), attribute)
 
 import qualified Data.Text as T
 
@@ -20,12 +20,12 @@ type NewsCategory = String
 data NewsEntry = NewsEntry NewsCategory Title Url deriving (Eq)
 
 instance Show NewsEntry where
-  show (NewsEntry cat title url) = "[" ++ show cat ++ "] " ++ title ++ " {" ++ url ++ "}"
+  show (NewsEntry cat title url) = "[" ++ cat ++ "] " ++ title ++ " {" ++ url ++ "}"
 
 test :: IO ()
 test = do
   cursor <- liftM (fromDocument . parseLBS) (todaysLink >>= simpleHttp)
-  putStrLn . show . length . child $ cursorNews cursor
+  putStrLn . show . filter (not . null) . map ($| element "ul" &/ element "li" &/ element "a" &| attribute "href") . child $ cursorNews cursor
 
 scrape :: IO ()
 scrape = liftM (buildNewsList . cursorNews . fromDocument . parseLBS) (todaysLink >>= simpleHttp) >>= putStrLn . show
@@ -36,13 +36,18 @@ buildNewsList = buildNewsList' "" . child
     buildNewsList' :: NewsCategory -> [Cursor] -> [NewsEntry]
     buildNewsList' _ [] = []
     buildNewsList' lastCategory (c:cs) =
-      case c $| element "dl" of
-        [] -> case c $| element "ul" &/ element "li" of
-          [] -> buildNewsList' lastCategory cs
-          _  -> case c $| element "ul" &/ element "li" &/ element "ul" &/ element "li" of
-            [] -> NewsEntry lastCategory (c $.// T.unpack . T.strip . T.concat . content) "" : buildNewsList' lastCategory cs
-            _  -> buildNewsList' lastCategory ((c $| element "ul" &/ element "li" &/ element "ul") ++ cs)
-        _  -> buildNewsList' (c $.// T.unpack . T.strip . T.concat . content) cs
+      let firstLevel = element "ul" &/ element "li"
+          secondLevel = firstLevel &/ firstLevel
+      in  case c $| element "dl" of
+            [] -> case c $| firstLevel of
+              [] -> buildNewsList' lastCategory cs
+              _  -> case c $| secondLevel of
+                [] -> NewsEntry lastCategory
+                                (c $.// T.unpack . T.dropAround (`elem` ("\t\r\n\f\v\xa0" :: String)) . T.concat . content)
+                                ((head (reverse (c $| firstLevel &/ element "a"))) $| T.unpack . T.concat . attribute "href")
+                                : buildNewsList' lastCategory cs
+                _  -> buildNewsList' lastCategory ((c $| firstLevel &/ element "ul") ++ cs)
+            _  -> buildNewsList' (c $.// T.unpack . T.strip . T.concat . content) cs
 
 cursorNews :: Cursor -> Cursor
 cursorNews cursor = cut . head $ cursor $// element "td" >=> attributeIs "class" "description"
