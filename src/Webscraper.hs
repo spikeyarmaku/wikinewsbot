@@ -17,28 +17,7 @@ type Date = (Integer, Int, Int)
 type Title = String
 type Url = String
 type NewsCategory = String
-data NewsEntry = NewsEntry NewsCategory Title Url deriving (Eq)
-
-instance Show NewsEntry where
-  show (NewsEntry cat title url) = "[" ++ cat ++ "] " ++ title ++ " {" ++ url ++ "}"
-
-printList :: Show a => [a] -> String
-printList xs = "[ " ++ printList' xs ++ " ]"
-  where
-    printList' :: Show a => [a] -> String
-    printList' (x':[]) = show x'
-    printList' (x':xs') = show x' ++ "\n, " ++ printList' xs'
-
-test :: IO ()
-test = do
-  cursor <- liftM (fromDocument . parseLBS) (return "https://en.wikipedia.org/wiki/Portal:Current_events/2017_July_14" >>= simpleHttp)
-  putStrLn . show . map (attribute "href") . filter (not . isAttribute "class" "external text") . descendant $ cursorNews cursor
-
-isElement :: String -> Cursor -> Bool
-isElement e c =
-  case node c of
-    NodeElement el -> (T.unpack . nameLocalName . elementName) el == e
-    _              -> False
+data NewsEntry = NewsEntry NewsCategory Title Url deriving (Eq, Show)
 
 isAttribute :: String -> String -> Cursor -> Bool
 isAttribute attr val c =
