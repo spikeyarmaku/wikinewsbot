@@ -5,4 +5,4 @@ module Main where
 import Webscraper
 
 main :: IO ()
-main = scrape
+main = scrape >>= putStrLn . show

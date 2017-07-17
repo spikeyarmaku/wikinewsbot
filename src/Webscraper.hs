@@ -5,13 +5,13 @@ module Webscraper where
 import Control.Monad        (liftM)
 import Network.HTTP.Conduit (simpleHttp)
 import Text.HTML.DOM        (parseLBS)
-import Text.XML.Cursor      ( fromDocument, Cursor, element, attributeIs, (>=>)
-                            , child, content, ($//), ($/), (&/), (&//), cut
-                            , (&|), ($|), ($.//), attribute)
 
-import qualified Data.Text as T
+import qualified Data.Text     as T
+import qualified Data.Map.Lazy as M
 
 import Data.Time
+import Text.XML hiding (parseLBS)
+import Text.XML.Cursor
 
 type Date = (Integer, Int, Int)
 type Title = String
@@ -22,32 +22,72 @@ data NewsEntry = NewsEntry NewsCategory Title Url deriving (Eq)
 instance Show NewsEntry where
   show (NewsEntry cat title url) = "[" ++ cat ++ "] " ++ title ++ " {" ++ url ++ "}"
 
+printList :: Show a => [a] -> String
+printList xs = "[ " ++ printList' xs ++ " ]"
+  where
+    printList' :: Show a => [a] -> String
+    printList' (x':[]) = show x'
+    printList' (x':xs') = show x' ++ "\n, " ++ printList' xs'
+
 test :: IO ()
 test = do
-  cursor <- liftM (fromDocument . parseLBS) (todaysLink >>= simpleHttp)
-  putStrLn . show . filter (not . null) . map ($| element "ul" &/ element "li" &/ element "a" &| attribute "href") . child $ cursorNews cursor
+  cursor <- liftM (fromDocument . parseLBS) (return "https://en.wikipedia.org/wiki/Portal:Current_events/2017_July_14" >>= simpleHttp)
+  putStrLn . show . map (attribute "href") . filter (not . isAttribute "class" "external text") . descendant $ cursorNews cursor
 
-scrape :: IO ()
-scrape = liftM (buildNewsList . cursorNews . fromDocument . parseLBS) (todaysLink >>= simpleHttp) >>= putStrLn . show
+isElement :: String -> Cursor -> Bool
+isElement e c =
+  case node c of
+    NodeElement el -> (T.unpack . nameLocalName . elementName) el == e
+    _              -> False
+
+isAttribute :: String -> String -> Cursor -> Bool
+isAttribute attr val c =
+  case node c of
+    NodeElement el -> case M.lookup (Name (T.pack attr) Nothing Nothing) (elementAttributes el) of
+                        Nothing -> False
+                        Just x -> x == T.pack val
+    _              -> False
+
+elemName :: Cursor -> String
+elemName c =
+  case node c of
+    NodeElement el -> T.unpack . nameLocalName . elementName $ el
+    _              -> "N/A"
+
+scrape :: IO [NewsEntry]
+scrape = liftM (buildNewsList . cursorNews . fromDocument . parseLBS) (todaysLink >>= simpleHttp)
 
 buildNewsList :: Cursor -> [NewsEntry]
 buildNewsList = buildNewsList' "" . child
   where
     buildNewsList' :: NewsCategory -> [Cursor] -> [NewsEntry]
     buildNewsList' _ [] = []
-    buildNewsList' lastCategory (c:cs) =
-      let firstLevel = element "ul" &/ element "li"
-          secondLevel = firstLevel &/ firstLevel
-      in  case c $| element "dl" of
-            [] -> case c $| firstLevel of
-              [] -> buildNewsList' lastCategory cs
-              _  -> case c $| secondLevel of
-                [] -> NewsEntry lastCategory
-                                (c $.// T.unpack . T.dropAround (`elem` ("\t\r\n\f\v\xa0" :: String)) . T.concat . content)
-                                ((head (reverse (c $| firstLevel &/ element "a"))) $| T.unpack . T.concat . attribute "href")
-                                : buildNewsList' lastCategory cs
-                _  -> buildNewsList' lastCategory ((c $| firstLevel &/ element "ul") ++ cs)
-            _  -> buildNewsList' (c $.// T.unpack . T.strip . T.concat . content) cs
+    buildNewsList' newsCat (c:cs) =
+      case elemName c of
+        "dl" -> buildNewsList' (getNewsCategory c) cs
+        "ul" -> getNewsEntries newsCat c ++ buildNewsList' newsCat cs
+        _    -> buildNewsList' newsCat cs
+
+getNewsCategory :: Cursor -> String
+getNewsCategory c = c $// T.unpack . T.strip . T.concat . content
+
+getNewsEntries :: NewsCategory -> Cursor -> [NewsEntry]
+getNewsEntries nc c' = map (\c -> NewsEntry nc (getTitle c) (getLink c)) (getBottomLevelEntries c')
+
+getBottomLevelEntries :: Cursor -> [Cursor]
+getBottomLevelEntries c = (c $/ element "li" >=> check isBottomLevel) ++ concatMap getBottomLevelEntries (c $/ element "li" &/ element "ul")
+
+isBottomLevel :: Cursor -> Bool
+isBottomLevel c = null (c $/ element "ul")
+
+getTitle :: Cursor -> String
+getTitle c = (T.unpack . T.dropAround (`elem` (" \t\r\n\f\v\xa0" :: String)) . T.concat) (concatMap ($.// content) (ditchExternalLinks c))
+  where
+    ditchExternalLinks :: Cursor -> [Cursor]
+    ditchExternalLinks c' = c' $/ check (not . isAttribute "class" "external text")
+
+getLink :: Cursor -> String
+getLink c = ((head (c $.// element "a" >=> attributeIs "class" "external text")) $| T.unpack . T.concat . attribute "href")
 
 cursorNews :: Cursor -> Cursor
 cursorNews cursor = cut . head $ cursor $// element "td" >=> attributeIs "class" "description"
