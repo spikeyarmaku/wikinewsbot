@@ -3,6 +3,7 @@
 module Webscraper where
 
 import Control.Monad        (liftM)
+import Data.Time.Clock      (UTCTime())
 import Network.HTTP.Conduit (simpleHttp)
 import Text.HTML.DOM        (parseLBS)
 
@@ -13,11 +14,9 @@ import Data.Time
 import Text.XML hiding (parseLBS)
 import Text.XML.Cursor
 
+import Types
+
 type Date = (Integer, Int, Int)
-type Title = String
-type Url = String
-type NewsCategory = String
-data NewsEntry = NewsEntry NewsCategory Title Url deriving (Eq, Show)
 
 isAttribute :: String -> String -> Cursor -> Bool
 isAttribute attr val c =
@@ -33,8 +32,8 @@ elemName c =
     NodeElement el -> T.unpack . nameLocalName . elementName $ el
     _              -> "N/A"
 
-scrape :: IO [NewsEntry]
-scrape = liftM (buildNewsList . cursorNews . fromDocument . parseLBS) (todaysLink >>= simpleHttp)
+scrape :: UTCTime -> IO [NewsEntry]
+scrape t = liftM (buildNewsList . cursorNews . fromDocument . parseLBS) (simpleHttp $ todaysLink t)
 
 buildNewsList :: Cursor -> [NewsEntry]
 buildNewsList = buildNewsList' "" . child
@@ -71,13 +70,13 @@ getLink c = ((head (c $.// element "a" >=> attributeIs "class" "external text"))
 cursorNews :: Cursor -> Cursor
 cursorNews cursor = cut . head $ cursor $// element "td" >=> attributeIs "class" "description"
 
-currentDate :: IO Date
-currentDate = getCurrentTime >>= return . toGregorian . utctDay
+currentDate :: UTCTime -> Date
+currentDate = toGregorian . utctDay
 
 wikiPortalLink :: Date -> String
 wikiPortalLink (y, m, d) = "https://en.wikipedia.org/wiki/Portal:Current_events/" ++ dateString
   where
     dateString = show y ++ "_" ++ (fst . (!! (m - 1)) . months $ defaultTimeLocale) ++ "_" ++ show d
 
-todaysLink :: IO String
-todaysLink = currentDate >>= return . wikiPortalLink
+todaysLink :: UTCTime -> String
+todaysLink = wikiPortalLink . currentDate
