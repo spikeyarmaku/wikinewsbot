@@ -21,5 +21,6 @@ data Settings = Settings {currentTime :: UTCTime}
 type WikiBot a = RedditT IO a
 
 data Task = PostEntry NewsEntry
-          | EditEntry RedditEntry NewsEntry
           | MarkDeleted RedditEntry
+          | ChangeFlair RedditEntry NewsCategory
+          deriving (Eq, Show)

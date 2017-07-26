@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Webscraper where
+module Webscraper (scrape) where
 
 import Control.Monad        (liftM)
 import Data.Time.Clock      (UTCTime())
