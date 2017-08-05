@@ -3,7 +3,7 @@
 module Webscraper (scrape) where
 
 import Control.Monad        (liftM)
-import Data.Maybe           (listToMaybe, catMaybes)
+import Data.Maybe           (catMaybes)
 import Data.Time.Clock      (UTCTime())
 import Network.HTTP.Conduit (simpleHttp)
 import Text.HTML.DOM        (parseLBS)
@@ -54,7 +54,8 @@ getNewsEntries :: NewsCategory -> Cursor -> [NewsEntry]
 getNewsEntries nc c' =
   catMaybes . map (\c -> case getLink c of
                           Nothing -> Nothing
-                          Just link -> NewsEntry nc (getTitle c) link (getBottomLevelEntries c'))
+                          Just link -> Just $ NewsEntry nc (getTitle c) link)
+            $ (getBottomLevelEntries c')
 
 getBottomLevelEntries :: Cursor -> [Cursor]
 getBottomLevelEntries c = (c $/ element "li" >=> check isBottomLevel) ++ concatMap getBottomLevelEntries (c $/ element "li" &/ element "ul")
@@ -69,7 +70,11 @@ getTitle c = (T.unpack . T.dropAround (`elem` (" \t\r\n\f\v\xa0" :: String)) . T
     ditchExternalLinks c' = c' $/ check (not . isAttribute "class" "external text")
 
 getLink :: Cursor -> Maybe String
-getLink c = ((listToMaybe (c $.// element "a" >=> attributeIs "class" "external text")) $| T.unpack . T.concat . attribute "href")
+getLink c =
+  let cur = (c $.// element "a" >=> attributeIs "class" "external text")
+  in  if not (null cur)
+        then Just $ (head cur) $| T.unpack . T.concat . attribute "href"
+        else Nothing
 
 cursorNews :: Cursor -> Cursor
 cursorNews cursor = cut . head $ cursor $// element "td" >=> attributeIs "class" "description"
