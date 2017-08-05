@@ -54,7 +54,7 @@ getNewsEntries :: NewsCategory -> Cursor -> [NewsEntry]
 getNewsEntries nc c' =
   catMaybes . map (\c -> case getLink c of
                           Nothing -> Nothing
-                          Just link -> NewsEntry nc (getTitle c) link (getBottomLevelEntries c')
+                          Just link -> NewsEntry nc (getTitle c) link (getBottomLevelEntries c'))
 
 getBottomLevelEntries :: Cursor -> [Cursor]
 getBottomLevelEntries c = (c $/ element "li" >=> check isBottomLevel) ++ concatMap getBottomLevelEntries (c $/ element "li" &/ element "ul")
