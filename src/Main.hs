@@ -35,7 +35,7 @@ withReddit (Credential user pass) =
     (R.RedditOptions
       True Nothing
       (R.Credentials (T.toStrict . T.pack $ user) (T.toStrict . T.pack $ pass))
-      (Just "windows:wikinews-bot:0.2.0 (by /u/nulloid)"))
+      (Just "useragent goes here..."))
 
 runBot :: UTCTime -> Credential -> IO ()
 runBot t c = do
