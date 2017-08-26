@@ -2,11 +2,12 @@
 
 module Main where
 
-import Data.Either     (either)
-import Data.Maybe      (mapMaybe)
-import Data.Time.Clock (getCurrentTime, UTCTime())
-import System.IO       (IOMode(ReadMode), withFile, hGetLine, hSetBuffering, stdout, stderr, BufferMode(NoBuffering))
-import System.IO.Error (tryIOError)
+import Data.Either        (either)
+import Data.Maybe         (mapMaybe)
+import Data.Time.Clock    (getCurrentTime, UTCTime())
+import System.Environment (getArgs)
+import System.IO          ( {- IOMode(ReadMode), withFile, hGetLine, -} hSetBuffering, stdout, stderr, BufferMode(NoBuffering))
+-- import System.IO.Error    (tryIOError)
 
 import qualified Data.Text.Lazy    as T
 import qualified Text.EditDistance as E
@@ -27,7 +28,7 @@ main = do
   hSetBuffering stdout NoBuffering
   hSetBuffering stderr NoBuffering
   t <- getCurrentTime
-  readCredential >>= either error (runBot t)
+  readCredential >>= either putStrLn (runBot t)
 
 withReddit :: Credential -> R.Reddit a -> IO (Either (R.APIError R.RedditError) a)
 withReddit (Credential user pass) =
@@ -48,11 +49,15 @@ runBot t c = do
     Right x -> return x
 
 readCredential :: IO (Either ErrorMessage Credential)
-readCredential =
-  withFile  "credential.txt" ReadMode $ \h ->
-    tryIOError (hGetLine h) >>= either (return . Left . show) (\user ->
-      tryIOError (hGetLine h) >>= either (return . Left . show) (\pass ->
-        return . Right $ Credential user pass))
+readCredential = do
+  args <- getArgs
+  case args of
+    username:password:_ -> return $ Right (Credential username password)
+    _                   -> return $ Left "No credential provided. Usage: wikinewsbot username password"
+  -- withFile  "credential.txt" ReadMode $ \h ->
+  --   tryIOError (hGetLine h) >>= either (return . Left . show) (\user ->
+  --     tryIOError (hGetLine h) >>= either (return . Left . show) (\pass ->
+  --       return . Right $ Credential user pass))
 
 createTasks :: [NewsEntry] -> [RedditEntry] -> [Task]
 createTasks ns rs = mapMaybe (flip checkNews $ rs) ns ++ mapMaybe (flip checkRedditPost $ ns) rs
