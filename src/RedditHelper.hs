@@ -40,12 +40,12 @@ executeTask :: Task -> Reddit ()
 executeTask (PostEntry ne) = do
   liftIO $ putStrLn "Submitting post"
   newPostId <- submitLink wikinewsName
-                          (T.toStrict . T.pack . take 300 $ newsTitle ne)
+                          (T.toStrict . T.pack $ newsTitle ne)
                           (T.toStrict . T.pack $ url ne)
   setPostFlair wikinewsName newPostId (T.toStrict . T.pack $ newsCategory ne) (T.toStrict . T.pack . head . words $ newsCategory ne)
 executeTask (MarkDeleted re) = do
   liftIO $ putStrLn "Marking deleted"
-  setPostFlair wikinewsName (postId re) (T.toStrict . T.pack $ "Deleted") (T.toStrict . T.pack $ "deleted")
+  setPostFlair wikinewsName (postId re) (T.toStrict . T.pack $ "Deleted") (T.toStrict . T.pack $ "Deleted")
 executeTask (ChangeFlair re nc) = do
   liftIO $ putStrLn "Changing flair"
   setPostFlair wikinewsName (postId re) (T.toStrict . T.pack $ nc) (T.toStrict . T.pack . head . words $ nc)
