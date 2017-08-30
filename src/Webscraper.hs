@@ -54,7 +54,7 @@ getNewsEntries :: NewsCategory -> Cursor -> [NewsEntry]
 getNewsEntries nc c' =
   catMaybes . map (\c -> case getLink c of
                           Nothing -> Nothing
-                          Just link -> Just $ NewsEntry nc (getTitle c) link)
+                          Just link -> Just $ NewsEntry nc (truncateTitle 300 . getTitle $ c) link)
             $ (getBottomLevelEntries c')
 
 getBottomLevelEntries :: Cursor -> [Cursor]
@@ -62,6 +62,9 @@ getBottomLevelEntries c = (c $/ element "li" >=> check isBottomLevel) ++ concatM
 
 isBottomLevel :: Cursor -> Bool
 isBottomLevel c = null (c $/ element "ul")
+
+truncateTitle :: Int -> String -> String
+truncateTitle n t = if length t > n then take (n - 3) t ++ "..." else t
 
 getTitle :: Cursor -> String
 getTitle c = (T.unpack . T.dropAround (`elem` (" \t\r\n\f\v\xa0" :: String)) . T.concat) (concatMap ($.// content) (ditchExternalLinks c))

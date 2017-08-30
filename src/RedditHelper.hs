@@ -39,11 +39,8 @@ wikinewsName = (R . T.toStrict . T.pack $ "WikiNews")
 executeTask :: Task -> Reddit ()
 executeTask (PostEntry ne) = do
   liftIO $ putStrLn "Submitting post"
-  let neTitle = if length (newsTitle ne) > 300
-                  then take 297 (newsTitle ne) ++ "..."
-                  else newsTitle ne
   newPostId <- submitLink wikinewsName
-                          (T.toStrict . T.pack $ neTitle)
+                          (T.toStrict . T.pack $ newsTitle ne)
                           (T.toStrict . T.pack $ url ne)
   setPostFlair wikinewsName newPostId (T.toStrict . T.pack $ newsCategory ne) (T.toStrict . T.pack . head . words $ newsCategory ne)
 executeTask (MarkDeleted re) = do
