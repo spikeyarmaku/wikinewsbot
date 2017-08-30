@@ -38,7 +38,7 @@ wikinewsName = (R . T.toStrict . T.pack $ "WikiNews")
 
 executeTask :: Task -> Reddit ()
 executeTask (PostEntry ne) = do
-  liftIO $ putStrLn "Submitting post"
+  liftIO . putStrLn $ "Submitting post: [" ++ newsCategory ne ++ "] " ++ (newsTitle ne)
   newPostId <- submitLink wikinewsName
                           (T.toStrict . T.pack $ newsTitle ne)
                           (T.toStrict . T.pack $ url ne)

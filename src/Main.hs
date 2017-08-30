@@ -2,6 +2,8 @@
 
 module Main where
 
+import Control.Monad      (forM_)
+import Control.Monad.IO.Class (liftIO)
 import Data.Either        (either)
 import Data.Maybe         (mapMaybe)
 import Data.Time.Clock    (getCurrentTime, UTCTime())
@@ -10,7 +12,6 @@ import System.IO          ( {- IOMode(ReadMode), withFile, hGetLine, -} hSetBuff
 -- import System.IO.Error    (tryIOError)
 
 import qualified Data.Text.Lazy    as T
-import qualified Text.EditDistance as E
 import qualified Reddit            as R
 
 import Webscraper
@@ -36,24 +37,35 @@ withReddit (Credential user pass) =
     (R.RedditOptions
       True Nothing
       (R.Credentials (T.toStrict . T.pack $ user) (T.toStrict . T.pack $ pass))
-      (Just "useragent goes here..."))
+      (Just "OrangePI:wikinewsbot:1.1.0 (by /u/nulloid)"))
+
+-- runBot :: UTCTime -> Credential -> IO ()
+-- runBot t c = do
+--   wikiList <- scrape t
+--   ret <- withReddit c $ do
+--     redditList <- getRedditPosts t
+--     executeTasks $ createTasks wikiList redditList
+--   case ret of
+--     Left err -> print err
+--     Right x -> return x
 
 runBot :: UTCTime -> Credential -> IO ()
 runBot t c = do
   wikiList <- scrape t
-  ret <- withReddit c $ do
-    redditList <- getRedditPosts t
-    executeTasks $ createTasks wikiList redditList
-  case ret of
-    Left err -> print err
-    Right x -> return x
+  print wikiList
+  withReddit c (getRedditPosts t >>= \redditList -> do liftIO (print redditList); return $ createTasks wikiList redditList)
+    >>= \case
+      Left err -> print err
+      Right tasks ->  forM_ tasks $ \task -> do
+        ret <- withReddit c $ executeTask task
+        print ret
 
 readCredential :: IO (Either ErrorMessage Credential)
 readCredential = do
   args <- getArgs
   case args of
     username:password:_ -> return $ Right (Credential username password)
-    _                   -> return $ Left "No credential provided. Usage: wikinewsbot username password"
+    _                   -> return $ Left "No credential provided. Usage: wikinewsbot <username> <password>"
   -- withFile  "credential.txt" ReadMode $ \h ->
   --   tryIOError (hGetLine h) >>= either (return . Left . show) (\user ->
   --     tryIOError (hGetLine h) >>= either (return . Left . show) (\pass ->
@@ -75,29 +87,6 @@ checkRedditPost re ns =
     xs -> if (newsCategory . newsEntry $ re) == (newsCategory . head $ xs)
               then Nothing
               else Just (ChangeFlair re (newsCategory . head $ xs))
-
-class Entry a where
-  getTitle :: a -> String
-  getUrl :: a -> String
-
-instance Entry RedditEntry where
-  getTitle = newsTitle . newsEntry
-  getUrl = url . newsEntry
-
-instance Entry NewsEntry where
-  getTitle (NewsEntry _ t _) = t
-  getUrl (NewsEntry _ _ u) = u
-
-compareEntries :: (Entry a) => a -> a -> Bool
-compareEntries x y =
-  (getUrl x == getUrl y) || (E.levenshteinDistance E.defaultEditCosts tx ty < (min txl tyl `div` 10))
-  where
-    tx = getTitle x
-    ty = getTitle y
-    txl = length tx
-    tyl = length ty
-
--- equalEntries :: 
 
 -- news link is in reddit link? -- it was already posted
   -- if yes, compare titles.    -- check for edits
