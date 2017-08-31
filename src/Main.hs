@@ -40,7 +40,6 @@ withReddit (Credential user pass) =
 runBot :: UTCTime -> Credential -> IO ()
 runBot t c = do
   wikiList <- scrape t
-  print wikiList
   withReddit c (getRedditPosts t >>= \redditList -> return $ createTasks wikiList redditList)
     >>= \case
       Left err -> print err
