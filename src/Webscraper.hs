@@ -12,6 +12,9 @@ import qualified Data.Text     as T
 import qualified Data.Map.Lazy as M
 
 import Data.Time
+import Data.Text.Lazy (toStrict)
+import Data.Text.Lazy.Builder (toLazyText)
+import HTMLEntities.Decoder (htmlEncodedText)
 import Text.XML hiding (parseLBS)
 import Text.XML.Cursor
 
@@ -47,8 +50,8 @@ buildNewsList = buildNewsList' "" . child
         "ul" -> getNewsEntries newsCat c ++ buildNewsList' newsCat cs
         _    -> buildNewsList' newsCat cs
 
-getNewsCategory :: Cursor -> String
-getNewsCategory c = c $// T.unpack . T.strip . T.concat . content
+getNewsCategory :: Cursor -> T.Text
+getNewsCategory c = (T.strip . T.concat) (c $// content)
 
 getNewsEntries :: NewsCategory -> Cursor -> [NewsEntry]
 getNewsEntries nc c' =
@@ -63,20 +66,20 @@ getBottomLevelEntries c = (c $/ element "li" >=> check isBottomLevel) ++ concatM
 isBottomLevel :: Cursor -> Bool
 isBottomLevel c = null (c $/ element "ul")
 
-truncateTitle :: Int -> String -> String
-truncateTitle n t = if length t > n then take (n - 3) t ++ "..." else t
+truncateTitle :: Int -> T.Text -> T.Text
+truncateTitle n t = if T.length t > n then T.take (n - 3) t `T.append` "..." else t
 
-getTitle :: Cursor -> String
-getTitle c = (T.unpack . T.dropAround (`elem` (" \t\r\n\f\v\xa0" :: String)) . T.concat) (concatMap ($.// content) (ditchExternalLinks c))
+getTitle :: Cursor -> T.Text
+getTitle c = (T.dropAround (`elem` (" \t\r\n\f\v\xa0" :: String)) . T.concat) (concatMap ($.// content) (ditchExternalLinks c))
   where
     ditchExternalLinks :: Cursor -> [Cursor]
     ditchExternalLinks c' = c' $/ check (not . isAttribute "class" "external text")
 
-getLink :: Cursor -> Maybe String
+getLink :: Cursor -> Maybe T.Text
 getLink c =
   let cur = (c $.// element "a" >=> attributeIs "class" "external text")
   in  if not (null cur)
-        then Just $ (head cur) $| T.unpack . T.concat . attribute "href"
+        then Just $ (head cur) $| toStrict . toLazyText . htmlEncodedText . T.concat . attribute "href"
         else Nothing
 
 cursorNews :: Cursor -> Cursor

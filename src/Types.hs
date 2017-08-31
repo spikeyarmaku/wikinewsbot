@@ -1,12 +1,13 @@
 module Types where
 
 import Data.Time.Clock (UTCTime())
+import qualified Data.Text as T
 
 import Reddit
 
-type Title        = String
-type Url          = String
-type NewsCategory = String
+type Title        = T.Text
+type Url          = T.Text
+type NewsCategory = T.Text
 data NewsEntry    = NewsEntry { newsCategory :: NewsCategory
                               , newsTitle    :: Title
                               , url          :: Url }

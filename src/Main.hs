@@ -3,13 +3,11 @@
 module Main where
 
 import Control.Monad      (forM_)
-import Control.Monad.IO.Class (liftIO)
 import Data.Either        (either)
 import Data.Maybe         (mapMaybe)
 import Data.Time.Clock    (getCurrentTime, UTCTime())
 import System.Environment (getArgs)
-import System.IO          ( {- IOMode(ReadMode), withFile, hGetLine, -} hSetBuffering, stdout, stderr, BufferMode(NoBuffering))
--- import System.IO.Error    (tryIOError)
+import System.IO          (hSetBuffering, stdout, stderr, BufferMode(NoBuffering))
 
 import qualified Data.Text.Lazy    as T
 import qualified Reddit            as R
@@ -39,21 +37,11 @@ withReddit (Credential user pass) =
       (R.Credentials (T.toStrict . T.pack $ user) (T.toStrict . T.pack $ pass))
       (Just "OrangePI:wikinewsbot:1.1.0 (by /u/nulloid)"))
 
--- runBot :: UTCTime -> Credential -> IO ()
--- runBot t c = do
---   wikiList <- scrape t
---   ret <- withReddit c $ do
---     redditList <- getRedditPosts t
---     executeTasks $ createTasks wikiList redditList
---   case ret of
---     Left err -> print err
---     Right x -> return x
-
 runBot :: UTCTime -> Credential -> IO ()
 runBot t c = do
   wikiList <- scrape t
   print wikiList
-  withReddit c (getRedditPosts t >>= \redditList -> do liftIO (print redditList); return $ createTasks wikiList redditList)
+  withReddit c (getRedditPosts t >>= \redditList -> return $ createTasks wikiList redditList)
     >>= \case
       Left err -> print err
       Right tasks ->  forM_ tasks $ \task -> do
@@ -66,10 +54,6 @@ readCredential = do
   case args of
     username:password:_ -> return $ Right (Credential username password)
     _                   -> return $ Left "No credential provided. Usage: wikinewsbot <username> <password>"
-  -- withFile  "credential.txt" ReadMode $ \h ->
-  --   tryIOError (hGetLine h) >>= either (return . Left . show) (\user ->
-  --     tryIOError (hGetLine h) >>= either (return . Left . show) (\pass ->
-  --       return . Right $ Credential user pass))
 
 createTasks :: [NewsEntry] -> [RedditEntry] -> [Task]
 createTasks ns rs = mapMaybe (flip checkNews $ rs) ns ++ mapMaybe (flip checkRedditPost $ ns) rs
@@ -87,12 +71,3 @@ checkRedditPost re ns =
     xs -> if (newsCategory . newsEntry $ re) == (newsCategory . head $ xs)
               then Nothing
               else Just (ChangeFlair re (newsCategory . head $ xs))
-
--- news link is in reddit link? -- it was already posted
-  -- if yes, compare titles.    -- check for edits
-    -- if same, do nothing
-    -- if different, edit reddit post
-  -- if no, post
--- reddit link is in news link?
-  -- if yes, do nothing
-  -- if no, mark reddit post as deleted
