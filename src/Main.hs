@@ -39,13 +39,20 @@ withReddit (Credential user pass) =
 
 runBot :: UTCTime -> Credential -> IO ()
 runBot t c = do
+  putStr "Reading news from Wikipedia..."
   wikiList <- scrape t
+  print wikiList
+  putStrLn "done."
+  putStr "Reading posts from Reddit and creating tasks..."
   withReddit c (getRedditPosts t >>= \redditList -> return $ createTasks wikiList redditList)
     >>= \case
       Left err -> print err
-      Right tasks ->  forM_ tasks $ \task -> do
-        ret <- withReddit c $ executeTask task
-        print ret
+      Right tasks -> do
+        putStrLn "done."
+        putStrLn "Executing tasks..."
+        forM_ tasks $ \task -> do
+          ret <- withReddit c $ executeTask task
+          print ret
 
 readCredential :: IO (Either ErrorMessage Credential)
 readCredential = do
