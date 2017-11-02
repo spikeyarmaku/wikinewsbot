@@ -57,10 +57,14 @@ getNewsSingle cat str =
      (T.isPrefixOf "<!--" str) ||
      (T.length str < 3)
     then Nothing
-    else let titleAndUrl = extractTitle (snd . T.span (== '*') $ str)
+    else let titleAndUrl = unescape $ extractTitle (snd . T.span (== '*') $ str)
              title = T.strip $ fst $ T.break (== '[') titleAndUrl
              link = T.strip $ extractUrl titleAndUrl
          in  Just $ NewsEntry cat (truncateTitle 300 $ title) link
+
+-- Replaces backslash-escaped characters with the characetrs themselves
+unescape :: T.Text -> T.Text
+unescape = T.concat . T.splitOn "\\"
 
 extractTitle :: T.Text -> T.Text
 extractTitle "" = ""
