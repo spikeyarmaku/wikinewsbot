@@ -35,7 +35,7 @@ withReddit (Credential user pass) =
     (R.RedditOptions
       True Nothing
       (R.Credentials (T.toStrict . T.pack $ user) (T.toStrict . T.pack $ pass))
-      (Just "OrangePI:wikinewsbot:1.1.0 (by /u/nulloid)"))
+      (Just "Bot:identifier:0.1.0 (by creator)"))
 
 runBot :: UTCTime -> Credential -> IO ()
 runBot t c = do
